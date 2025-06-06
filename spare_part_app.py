@@ -21,7 +21,7 @@ if st:
     GITHUB_IMAGE_URL = "https://raw.githubusercontent.com/NattaBall/spare-part-app/main/images"
 
     if not os.path.exists(DB_FILE):
-        df = pd.DataFrame(columns=["Part No", "Name", "Category", "Stock", "Image Path", "History"])
+        df = pd.DataFrame(columns=["Part No", "Name", "Category", "Stock", "Image Path", "History", "Safety stock"])
         df.to_csv(DB_FILE, index=False)
     else:
         df = pd.read_csv(DB_FILE)
@@ -39,6 +39,56 @@ if st:
         if pd.isna(image_path) or str(image_path).strip().lower() in ["", "none", "nan"]:
             return f"{GITHUB_IMAGE_URL}/no_image.png"
         return f"{GITHUB_IMAGE_URL}/{image_path}"
+    
+# Section: Login
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+if not st.session_state["logged_in"]:
+    # ✅ CSS Background Login
+    st.markdown(
+        """
+        <style>
+        .stApp::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-image: url('https://raw.githubusercontent.com/NattaBall/spare-part-app/main/images/login%20background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0;
+            opacity: 0.4;
+            filter: blur(5px) brightness(0.7);
+        }
+        .block-container {
+            position: relative;
+            z-index: 1;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.subheader("🔒 กรุณาเข้าสู่ระบบ")
+    username = st.text_input("ชื่อผู้ใช้")
+    password = st.text_input("รหัสผ่าน", type="password")
+
+    if st.button("เข้าสู่ระบบดิ้"):
+        if username == "admin" and password == "yourStrongPassword":
+            st.session_state["logged_in"] = True
+            st.success("✅ เข้าสู่ระบบสำเร็จ ใจเย็นๆ กรุณารอสักครู่...")
+            st.rerun()
+        else:
+            st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้องจร้าา")
+
+            
+else:
+    # ✅ โหลด UI หลักตรงนี้เท่านั้น เมื่อ login แล้ว
+    st.sidebar.title("📂 เมนู")
 
     # Sidebar: Navigation
     menu = st.sidebar.radio("📂 เมนู", [
@@ -219,3 +269,10 @@ if st:
         df.to_excel(file_name, index=False)
         with open(file_name, "rb") as f:
             st.download_button("📥 ดาวน์โหลดไฟล์ Excel", f, file_name, mime="application/vnd.ms-excel")
+
+# Logout Button
+if "logged_in" in st.session_state and st.session_state["logged_in"]:
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🚪 ออกจากระบบ", type="primary"):
+        st.session_state["logged_in"] = False
+        st.rerun()
