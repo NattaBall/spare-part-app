@@ -18,6 +18,7 @@ if st:
     # File Storage
     DB_FILE = "spare_parts.csv"
     BACKUP_FILE = "backup_spare_parts.csv"
+    GITHUB_IMAGE_URL = "https://raw.githubusercontent.com/NattaBall/spare-part-app/main/images"
 
     if not os.path.exists(DB_FILE):
         df = pd.DataFrame(columns=["Part No", "Name", "Category", "Stock", "Image Path", "History"])
@@ -26,13 +27,18 @@ if st:
         df = pd.read_csv(DB_FILE)
 
     def save_data():
-        df.to_csv(BACKUP_FILE, index=False)  # backup before save
+        df.to_csv(BACKUP_FILE, index=False)
         df.to_csv(DB_FILE, index=False)
 
     def restore_backup():
         if os.path.exists(BACKUP_FILE):
             return pd.read_csv(BACKUP_FILE)
         return df
+
+    def get_image_url(image_path):
+        if pd.isna(image_path) or str(image_path).strip().lower() in ["", "none", "nan"]:
+            return f"{GITHUB_IMAGE_URL}/no_image.png"
+        return f"{GITHUB_IMAGE_URL}/{image_path}"
 
     # Sidebar: Navigation
     menu = st.sidebar.radio("📂 เมนู", [
@@ -50,14 +56,11 @@ if st:
     # Page 1: List with Images
     if menu == "📦 รายการอะไหล่ พร้อมรูปภาพ":
         st.subheader("รายการอะไหล่")
-        for i, row in df.iterrows():
+        for _, row in df.iterrows():
             col1, col2 = st.columns([1, 4])
             with col1:
-                image_path = os.path.join("images", str(row["Image Path"])) if row["Image Path"] else None
-                if image_path and os.path.exists(image_path):
-                    st.image(image_path, width=100)
-                else:
-                    st.warning("No image")
+                image_url = get_image_url(row["Image Path"])
+                st.image(image_url, width=100)
             with col2:
                 st.markdown(f"**{row['Part No']} - {row['Name']}**")
                 st.caption(f"หมวดหมู่: {row['Category']} | คงเหลือ: {row['Stock']}")
@@ -78,27 +81,46 @@ if st:
     elif menu == "➕ เพิ่ม / แก้ไข / ลบ อะไหล่":
         st.subheader("เพิ่ม / แก้ไข / ลบ")
         action = st.radio("เลือกการกระทำ", ["เพิ่ม", "แก้ไข", "ลบ"])
-        selected_part = st.selectbox("เลือกรายการ (สำหรับแก้/ลบ)", ["-"] + list(df["Part No"]))
+        selected_name = st.selectbox("เลือกรายการ (สำหรับแก้/ลบ)", ["-"] + list(df["Name"]))
 
-        part_no = st.text_input("Part No")
-        name = st.text_input("ชื่ออะไหล่")
-        category = st.text_input("หมวดหมู่")
-        stock = st.number_input("จำนวนคงเหลือ", 0)
-        image_path = st.text_input("ชื่อไฟล์รูปภาพ (เช่น 1.png) โดยเก็บไว้ในโฟลเดอร์ images/")
+        if selected_name != "-" and action == "แก้ไข":
+            selected_rows = df[df["Name"] == selected_name]
+            if not selected_rows.empty:
+                selected_row = selected_rows.iloc[0]
+                part_no = st.text_input("Part No", selected_row["Part No"])
+                name = st.text_input("ชื่ออะไหล่", selected_row["Name"])
+                category = st.text_input("หมวดหมู่", selected_row["Category"])
+                stock = st.number_input("จำนวนคงเหลือ", value=int(selected_row["Stock"]))
+                image_path = st.text_input("ชื่อไฟล์รูปภาพ (เช่น 1.png) โดยเก็บไว้ในโฟลเดอร์ images/", value=selected_row["Image Path"])
+            else:
+                st.warning("ไม่พบรายการที่เลือก")
+                part_no = name = category = image_path = ""
+                stock = 0
+        else:
+            part_no = st.text_input("Part No")
+            name = st.text_input("ชื่ออะไหล่")
+            category = st.text_input("หมวดหมู่")
+            stock = st.number_input("จำนวนคงเหลือ", 0)
+            image_path = st.text_input("ชื่อไฟล์รูปภาพ (เช่น 1.png) โดยเก็บไว้ในโฟลเดอร์ images/")
 
         if action == "เพิ่ม" and st.button("บันทึกเพิ่มใหม่"):
-            df.loc[len(df)] = [part_no, name, category, stock, image_path, ""]
-            save_data()
-            st.success("เพิ่มเรียบร้อยแล้ว")
+            if part_no in df["Part No"].values:
+                st.warning("Part No นี้มีอยู่แล้ว กรุณาใช้รหัสใหม่")
+            else:
+                df.loc[len(df)] = [part_no, name, category, stock, image_path, ""]
+                save_data()
+                st.success("เพิ่มเรียบร้อยแล้ว")
 
-        elif action == "แก้ไข" and selected_part != "-" and st.button("บันทึกการแก้ไข"):
-            idx = df[df["Part No"] == selected_part].index[0]
-            df.loc[idx] = [part_no, name, category, stock, image_path, df.loc[idx, "History"]]
-            save_data()
-            st.success("แก้ไขสำเร็จ")
+        elif action == "แก้ไข" and selected_name != "-" and st.button("บันทึกการแก้ไข"):
+            idx = df[df["Name"] == selected_name].index
+            if not idx.empty:
+                df.loc[idx[0]] = [part_no, name, category, stock, image_path, df.loc[idx[0], "History"]]
+                save_data()
+                st.success("แก้ไขสำเร็จ")
 
-        elif action == "ลบ" and selected_part != "-" and st.button("ลบรายการ"):
-            df.drop(df[df["Part No"] == selected_part].index, inplace=True)
+        elif action == "ลบ" and selected_name != "-" and st.button("ลบรายการ"):
+            df.drop(df[df["Name"] == selected_name].index, inplace=True)
+            df.reset_index(drop=True, inplace=True)
             save_data()
             st.success("ลบสำเร็จ")
 
@@ -110,11 +132,7 @@ if st:
 
         st.markdown(f"**Part No:** {df.loc[idx, 'Part No']}")
         st.markdown(f"**คงเหลือ:** {df.loc[idx, 'Stock']}")
-        img_path = os.path.join("images", str(df.loc[idx, "Image Path"]))
-        if os.path.exists(img_path):
-            st.image(img_path, width=150)
-        else:
-            st.warning("ไม่พบรูปภาพ")
+        st.image(get_image_url(df.loc[idx, "Image Path"]), width=150)
 
         qty = st.number_input("จำนวน", 0)
         user = st.text_input("ชื่อผู้ดำเนินการ")
@@ -122,15 +140,19 @@ if st:
 
         if st.button("บันทึกการดำเนินการ"):
             current_stock = df.loc[idx, "Stock"]
-            new_stock = current_stock - qty if action == "เบิก" else current_stock + qty
-            df.loc[idx, "Stock"] = new_stock
-            history_entry = f"{datetime.now()} | {action} {qty} by {user}\n"
-            existing_history = str(df.loc[idx, "History"]) if pd.notnull(df.loc[idx, "History"]) else ""
-            df.loc[idx, "History"] = existing_history + history_entry
-            save_data()
-            st.success("ดำเนินการเรียบร้อย")
 
-    # Page 4.5: Edit Stock History
+            if action == "เบิก" and qty > current_stock:
+                st.error("❌ ไม่สามารถเบิกได้ เนื่องจากจำนวนที่เบิกมากกว่าคงเหลือ")
+            else:
+                new_stock = current_stock - qty if action == "เบิก" else current_stock + qty
+                df.loc[idx, "Stock"] = new_stock
+                history_entry = f"{datetime.now()} | {action} {qty} by {user}\n"
+                existing_history = str(df.loc[idx, "History"]) if pd.notnull(df.loc[idx, "History"]) else ""
+                df.loc[idx, "History"] = existing_history + history_entry
+                save_data()
+                st.success("ดำเนินการเรียบร้อย")
+
+    # Page 5: Edit Stock History
     elif menu == "📝 แก้ไขประวัติสต๊อก":
         st.subheader("แก้ไขประวัติสต๊อก")
         selected_name = st.selectbox("เลือกชื่ออะไหล่ที่ต้องการแก้ไขประวัติ", df["Name"])
@@ -139,7 +161,6 @@ if st:
         st.markdown(f"**Part No:** {df.loc[idx, 'Part No']}")
         st.markdown(f"**Stock ปัจจุบัน:** {df.loc[idx, 'Stock']}")
         history_text = st.text_area("ประวัติเดิม", value=df.loc[idx, "History"], height=200)
-
         new_stock = st.number_input("แก้ไขจำนวนสต๊อก (ถ้าต้องการ)", value=int(df.loc[idx, "Stock"]))
 
         if st.button("บันทึกการแก้ไข"):
@@ -148,7 +169,7 @@ if st:
             save_data()
             st.success("แก้ไขเรียบร้อยแล้ว")
 
-    # Page 4.75: Restore
+    # Page 6: Restore Backup
     elif menu == "♻️ กู้คืนรายการล่าสุด":
         st.subheader("♻️ กู้คืนข้อมูลรายการอะไหล่ล่าสุด")
         if st.button("🔄 ดึงข้อมูลจากไฟล์ backup_spare_parts.csv"):
@@ -156,7 +177,7 @@ if st:
             save_data()
             st.success("กู้คืนข้อมูลล่าสุดเรียบร้อยแล้ว")
 
-    # Page 5: Upload CSV
+    # Page 7: Upload CSV
     elif menu == "📁 อัปโหลดรายการอะไหล่":
         st.subheader("อัปโหลดไฟล์ CSV รายการอะไหล่")
         uploaded_file = st.file_uploader("เลือกรายการไฟล์ .csv ที่ต้องการนำเข้า", type=["csv"])
@@ -183,7 +204,7 @@ if st:
                 else:
                     st.error(f"คอลัมน์ในไฟล์ไม่ตรงกับที่ระบบต้องการ: {required_cols}")
 
-    # Page 6: Dashboard
+    # Page 8: Dashboard
     elif menu == "📊 Dashboard":
         st.subheader("Dashboard")
         st.metric("รายการทั้งหมด", len(df))
@@ -191,12 +212,10 @@ if st:
         st.metric("สต๊อกรวม", df["Stock"].sum())
         st.bar_chart(df.groupby("Category")["Stock"].sum())
 
-    # Page 7: Export
+    # Page 9: Export
     elif menu == "📁 Export รายงาน":
         st.subheader("Export รายงาน")
         file_name = f"spare_part_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         df.to_excel(file_name, index=False)
         with open(file_name, "rb") as f:
             st.download_button("📥 ดาวน์โหลดไฟล์ Excel", f, file_name, mime="application/vnd.ms-excel")
-else:
-    sys.stderr.write("Streamlit is not available in this environment. Please run this code in your local machine with Streamlit installed.\n")
