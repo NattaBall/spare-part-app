@@ -21,7 +21,7 @@ if st:
     GITHUB_IMAGE_URL = "https://raw.githubusercontent.com/NattaBall/spare-part-app/main/images"
 
     if not os.path.exists(DB_FILE):
-        df = pd.DataFrame(columns=["Part No", "Name", "Category", "Stock", "Image Path", "History", "Safety stock"])
+        df = pd.DataFrame(columns=["Part No", "Name", "Category", "Stock", "Image Path", "History"])
         df.to_csv(DB_FILE, index=False)
     else:
         df = pd.read_csv(DB_FILE)
@@ -78,7 +78,7 @@ if not st.session_state["logged_in"]:
     password = st.text_input("รหัสผ่าน", type="password")
 
     if st.button("เข้าสู่ระบบดิ้"):
-        if username == "admin" and password == "yourStrongPassword":
+        if username == "admin" and password == "Password":
             st.session_state["logged_in"] = True
             st.success("✅ เข้าสู่ระบบสำเร็จ ใจเย็นๆ กรุณารอสักครู่...")
             st.rerun()
@@ -164,7 +164,8 @@ else:
         elif action == "แก้ไข" and selected_name != "-" and st.button("บันทึกการแก้ไข"):
             idx = df[df["Name"] == selected_name].index
             if not idx.empty:
-                df.loc[idx[0]] = [part_no, name, category, stock, image_path, df.loc[idx[0], "History"]]
+                df.loc[idx[0], ["Part No", "Name", "Category", "Stock", "Image Path"]] = [part_no, name, category, stock, image_path]
+
                 save_data()
                 st.success("แก้ไขสำเร็จ")
 
