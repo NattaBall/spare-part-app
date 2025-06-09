@@ -78,7 +78,7 @@ if not st.session_state["logged_in"]:
     password = st.text_input("รหัสผ่าน", type="password")
 
     if st.button("เข้าสู่ระบบดิ้"):
-        if username == "admin" and password == "Password":
+        if username == "Admin" and password == "1234":
             st.session_state["logged_in"] = True
             st.success("✅ เข้าสู่ระบบสำเร็จ ใจเย็นๆ กรุณารอสักครู่...")
             st.rerun()
